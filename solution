@@ -1,0 +1,186 @@
+Based on the requirements provided, here's an example implementation in C that meets the given specifications. This implementation assumes that the dictionary entries are stored in a file named "numbers.dict" in the same directory as the program.
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_LINE_LENGTH 100
+
+typedef struct {
+    int number;
+    char *text;
+} DictionaryEntry;
+
+int is_valid_integer(const char *str) {
+    if (*str == '-')
+        str++;
+    
+    while (*str != '\0') {
+        if (*str < '0' || *str > '9')
+            return 0;
+        str++;
+    }
+    
+    return 1;
+}
+
+int parse_dictionary(DictionaryEntry **dictionary) {
+    FILE *file = fopen("numbers.dict", "r");
+    if (file == NULL)
+        return 0;
+    
+    int capacity = 10;  // initial capacity of dictionary
+    int count = 0;
+    
+    *dictionary = malloc(capacity * sizeof(DictionaryEntry));
+    
+    char line[MAX_LINE_LENGTH];
+    while (fgets(line, sizeof(line), file)) {
+        char *key = strtok(line, ":");
+        char *value = strtok(NULL, "\n");
+        
+        if (key == NULL || value == NULL) {
+            fclose(file);
+            return 0;  // invalid line format
+        }
+        
+        // Trim leading and trailing spaces from key and value
+        while (*key == ' ')
+            key++;
+        int key_len = strlen(key);
+        while (key_len > 0 && key[key_len - 1] == ' ')
+            key_len--;
+        key[key_len] = '\0';
+        
+        while (*value == ' ')
+            value++;
+        int value_len = strlen(value);
+        while (value_len > 0 && value[value_len - 1] == ' ')
+            value_len--;
+        value[value_len] = '\0';
+        
+        if (!is_valid_integer(key)) {
+            fclose(file);
+            return 0;  // invalid key format
+        }
+        
+        int num = atoi(key);
+        
+        if (count >= capacity) {
+            capacity *= 2;
+            *dictionary = realloc(*dictionary, capacity * sizeof(DictionaryEntry));
+        }
+        
+        (*dictionary)[count].number = num;
+        (*dictionary)[count].text = strdup(value);
+        count++;
+    }
+    
+    fclose(file);
+    
+    return count;
+}
+
+char* find_number_in_dictionary(DictionaryEntry *dictionary, int count, int number) {
+    for (int i = 0; i < count; i++) {
+        if (dictionary[i].number == number)
+            return dictionary[i].text;
+    }
+    return NULL;
+}
+
+char* convert_number_to_text(DictionaryEntry *dictionary, int count, int number) {
+    if (number == 0)
+        return "zero";
+    
+    char *result = NULL;
+    
+    // Check if the number exists in the dictionary
+    result = find_number_in_dictionary(dictionary, count, number);
+    if (result != NULL)
+        return result;
+    
+    // Find the largest number less than the given number in the dictionary
+    int largest_number = 0;
+    for (int i = 0; i < count; i++) {
+        if (dictionary[i].number <= number && dictionary[i].number > largest_number)
+            largest_number = dictionary[i].number;
+    }
+    
+    // Recursively convert the remaining part of the number
+    int remaining = number - largest_number;
+    char *remaining_text = convert_number_to_text(dictionary, count, remaining);
+    
+    if (remaining_text != NULL) {
+        int result_len = strlen(dictionary[largest_number].text) + 1 + strlen(remaining_text) + 1;
+        result = malloc(result_len);
+        snprintf(result, result_len, "%s %s", dictionary[largest_number].text, remaining_text);
+        free(remaining_text);
+    }
+    
+    return result;
+}
+
+int main(int argc, char *argv[]) {
+    if (argc < 2 || argc > 3) {
+        printf("Error\n");
+        return 0;
+    }
+    
+    int number = atoi(argv[1]);
+    if (number <= 0 || !is_valid_integer(argv[1])) {
+        printf("Error\n");
+        return 0;
+    }
+    
+    DictionaryEntry *dictionary;
+    int count = parse_dictionary(&dictionary);
+    if (count == 0) {
+        printf("Dict Error\n");
+        return 0;
+    }
+    
+    char *text = convert_number_to_text(dictionary, count, number);
+    if (text == NULL) {
+        printf("Dict Error\n");
+        return 0;
+    }
+    
+    printf("%s\n", text);
+    
+    free(text);
+    for (int i = 0; i < count; i++)
+        free(dictionary[i].text);
+    free(dictionary);
+    
+    return 0;
+}
+```
+
+To compile the program and create the executable, you can use the provided Makefile:
+
+```makefile
+CC = gcc
+CFLAGS = -Wall -Wextra -Werror
+EXEC = rush-02
+SRC = main.c
+
+all: $(EXEC)
+
+$(EXEC): $(SRC)
+	$(CC) $(CFLAGS) $^ -o $@
+
+fclean:
+	rm -f $(EXEC)
+```
+
+To compile and run the program, you can execute the following commands in your terminal:
+
+```
+make fclean
+make
+./rush-02 42
+```
+
+The program will output the converted text value of the given number. If the number is not a valid unsigned integer or the dictionary cannot be parsed, the program will output the respective error messages as specified in the requirements.
